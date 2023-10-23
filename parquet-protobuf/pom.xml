@@ -22,11 +22,13 @@
     <artifactId>parquet</artifactId>
     <relativePath>../pom.xml</relativePath>
     <version>1.13.0</version>
+    <!-- <version>1.13.0-liftoff0</version> A -->
   </parent>
 
   <modelVersion>4.0.0</modelVersion>
 
   <artifactId>parquet-protobuf</artifactId>
+  <!-- <version>1.13.0-liftoff0</version> B -->
   <packaging>jar</packaging>
 
   <properties>

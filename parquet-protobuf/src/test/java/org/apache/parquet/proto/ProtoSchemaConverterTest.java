@@ -23,6 +23,7 @@ import com.google.protobuf.Message;
 import com.google.protobuf.Struct;
 import com.google.protobuf.Value;
 import org.junit.Test;
+import org.apache.parquet.proto.ProtoWriteSupport.DefaultFieldIdMapper;
 import org.apache.parquet.proto.TestUtils;
 import org.apache.parquet.proto.test.TestProto3;
 import org.apache.parquet.proto.test.TestProtobuf;
@@ -49,7 +50,7 @@ public class ProtoSchemaConverterTest {
   }
 
   private static void testConversion(Class<? extends Message> pbClass, String parquetSchemaString, ProtoSchemaConverter converter) {
-    MessageType schema = converter.convert(pbClass);
+    MessageType schema = converter.convert(pbClass, new DefaultFieldIdMapper());
     MessageType expectedMT = MessageTypeParser.parseMessageType(parquetSchemaString);
     assertEquals(expectedMT.toString(), schema.toString());
   }
@@ -521,16 +522,16 @@ public class ProtoSchemaConverterTest {
     long expectedBinaryTreeSize = 4;
     long expectedStructSize = 7;
     for (int i = 0; i < 10; ++i) {
-      MessageType deepSchema = new ProtoSchemaConverter(true, i).convert(Trees.WideTree.class);
+      MessageType deepSchema = new ProtoSchemaConverter(true, i).convert(Trees.WideTree.class, new DefaultFieldIdMapper());
       // 3, 5, 7, 9, 11, 13, 15, 17, 19, 21
       assertEquals(2 * i + 3, deepSchema.getPaths().size());
 
-      deepSchema = new ProtoSchemaConverter(true, i).convert(Trees.BinaryTree.class);
+      deepSchema = new ProtoSchemaConverter(true, i).convert(Trees.BinaryTree.class, new DefaultFieldIdMapper());
       // 4, 10, 22, 46, 94, 190, 382, 766, 1534, 3070
       assertEquals(expectedBinaryTreeSize, deepSchema.getPaths().size());
       expectedBinaryTreeSize = 2 * expectedBinaryTreeSize + 2;
 
-      deepSchema = new ProtoSchemaConverter(true, i).convert(Struct.class);
+      deepSchema = new ProtoSchemaConverter(true, i).convert(Struct.class, new DefaultFieldIdMapper());
       // 7, 18, 40, 84, 172, 348, 700, 1404, 2812, 5628
       assertEquals(expectedStructSize, deepSchema.getPaths().size());
       expectedStructSize = 2 * expectedStructSize + 4;

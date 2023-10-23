@@ -10,6 +10,7 @@
   <groupId>org.apache.parquet</groupId>
   <artifactId>parquet</artifactId>
   <version>1.13.0</version>
+  <!-- <version>1.13.0-liftoff0</version> C -->
   <packaging>pom</packaging>
 
   <name>Apache Parquet MR</name>
@@ -142,7 +143,7 @@
     <module>parquet-column</module>
     <module>parquet-common</module>
     <module>parquet-encoding</module>
-    <module>parquet-format-structures</module>
+    <!-- <module>parquet-format-structures</module> -->
     <module>parquet-generator</module>
     <module>parquet-hadoop</module>
     <module>parquet-jackson</module>
