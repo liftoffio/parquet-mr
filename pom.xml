@@ -10,7 +10,6 @@
   <groupId>org.apache.parquet</groupId>
   <artifactId>parquet</artifactId>
   <version>1.13.0</version>
-  <!-- <version>1.13.0-liftoff0</version> C -->
   <packaging>pom</packaging>
 
   <name>Apache Parquet MR</name>
@@ -76,7 +75,7 @@
     <jackson.package>com.fasterxml.jackson</jackson.package>
     <jackson.version>2.13.4</jackson.version>
     <jackson-databind.version>2.13.4.2</jackson-databind.version>
-    <japicmp.version>0.14.2</japicmp.version>
+    <japicmp.version>0.18.2</japicmp.version>
     <shade.prefix>shaded.parquet</shade.prefix>
     <hadoop.version>3.2.3</hadoop.version>
     <parquet.format.version>2.9.0</parquet.format.version>
@@ -549,6 +548,7 @@
                 compatibility check because of missing dependencies -->
               <excludeModule>parquet-hadoop-bundle</excludeModule>
               <excludeModule>parquet-pig-bundle</excludeModule>
+              <excludeModule>parquet-protobuf</excludeModule>
             </excludeModules>
             <excludes>
               <exclude>${shade.prefix}</exclude>
