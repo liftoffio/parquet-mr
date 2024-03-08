@@ -50,7 +50,7 @@ public class ProtoSchemaConverterTest {
   }
 
   private static void testConversion(Class<? extends Message> pbClass, String parquetSchemaString, ProtoSchemaConverter converter) {
-    MessageType schema = converter.convert(pbClass, new DefaultFieldIdMapper());
+    MessageType schema = converter.convert(pbClass, false, new DefaultFieldIdMapper());
     MessageType expectedMT = MessageTypeParser.parseMessageType(parquetSchemaString);
     assertEquals(expectedMT.toString(), schema.toString());
   }
@@ -522,7 +522,7 @@ public class ProtoSchemaConverterTest {
     long expectedBinaryTreeSize = 4;
     long expectedStructSize = 7;
     for (int i = 0; i < 10; ++i) {
-      MessageType deepSchema = new ProtoSchemaConverter(true, i).convert(Trees.WideTree.class, new DefaultFieldIdMapper());
+      MessageType deepSchema = new ProtoSchemaConverter(true, i).convert(Trees.WideTree.class, false, new DefaultFieldIdMapper());
       // 3, 5, 7, 9, 11, 13, 15, 17, 19, 21
       assertEquals(2 * i + 3, deepSchema.getPaths().size());
 

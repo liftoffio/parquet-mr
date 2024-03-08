@@ -27,7 +27,7 @@
   <modelVersion>4.0.0</modelVersion>
 
   <artifactId>parquet-protobuf</artifactId>
-  <version>1.13.0-liftoff0</version>
+  <version>1.13.0-liftoff1</version>
   <packaging>jar</packaging>
 
   <properties>
