@@ -116,21 +116,29 @@ public class ProtoSchemaConverter {
     config.setInt(PB_MAX_RECURSION, maxRecursion);
   }
 
+  public MessageType convert(Descriptors.Descriptor descriptor, FieldIdMapper mapper) {
+    return convert(descriptor, false, mapper);
+  }
+
   /**
    * Converts a given protobuf message descriptor to a parquet schema.
    *
    * @param descriptor  The protobuf message descriptor to convert.
    * @return The parquet schema encoded as a MessageType.
    */
-  public MessageType convert(Descriptors.Descriptor descriptor, FieldIdMapper mapper) {
+  public MessageType convert(Descriptors.Descriptor descriptor, boolean enumAsString, FieldIdMapper mapper) {
     // Remember classes seen with depths to avoid cycles.
     int depth = 0;
     ImmutableSetMultimap<String, Integer> seen = ImmutableSetMultimap.of(descriptor.getFullName(), depth);
     LOG.trace("convert:\n{}", descriptor.toProto());
-    MessageType messageType = convertFields(Types.buildMessage(), descriptor.getName(), descriptor.getFields(), mapper, seen, depth)
+    MessageType messageType = convertFields(Types.buildMessage(), descriptor.getName(), descriptor.getFields(), enumAsString, mapper, seen, depth)
         .named(descriptor.getFullName());
     LOG.debug("Converter info:\n{}\n  was converted to:\n{}", descriptor.toProto(), messageType);
     return messageType;
+  }
+
+  public MessageType convert(Class<? extends Message> protobufClass, FieldIdMapper mapper) {
+    return convert(protobufClass, false, mapper);
   }
 
   /**
@@ -139,16 +147,16 @@ public class ProtoSchemaConverter {
    * @param protobufClass  The protobuf message class (e.g. MyMessage.class) to convert.
    * @return The parquet schema encoded as a MessageType.
    */
-  public MessageType convert(Class<? extends Message> protobufClass, FieldIdMapper mapper) {
+  public MessageType convert(Class<? extends Message> protobufClass, boolean enumAsString, FieldIdMapper mapper) {
     LOG.debug("Converting protocol buffer class \"{}\" to parquet schema", protobufClass);
     Descriptors.Descriptor descriptor = Protobufs.getMessageDescriptor(protobufClass);
-    return convert(descriptor, mapper);
+    return convert(descriptor, enumAsString, mapper);
   }
 
   /* Iterates over list of fields. **/
-  private <T> GroupBuilder<T> convertFields(GroupBuilder<T> groupBuilder, String context, List<FieldDescriptor> fieldDescriptors, FieldIdMapper mapper, ImmutableSetMultimap<String, Integer> seen, int depth) {
+  private <T> GroupBuilder<T> convertFields(GroupBuilder<T> groupBuilder, String context, List<FieldDescriptor> fieldDescriptors, boolean enumAsString, FieldIdMapper mapper, ImmutableSetMultimap<String, Integer> seen, int depth) {
     for (FieldDescriptor fieldDescriptor : fieldDescriptors) {
-      groupBuilder = addField(context, fieldDescriptor, groupBuilder, mapper, seen, depth)
+      groupBuilder = addField(context, fieldDescriptor, groupBuilder, enumAsString, mapper, seen, depth)
           .id(mapper.mapFieldId(context + "." + fieldDescriptor.getName(), fieldDescriptor))
           .named(fieldDescriptor.getName());
     }
@@ -165,12 +173,12 @@ public class ProtoSchemaConverter {
     }
   }
 
-  private <T> Builder<? extends Builder<?, GroupBuilder<T>>, GroupBuilder<T>> addField(String context, FieldDescriptor descriptor, final GroupBuilder<T> builder, FieldIdMapper mapper, ImmutableSetMultimap<String, Integer> seen, int depth) {
+  private <T> Builder<? extends Builder<?, GroupBuilder<T>>, GroupBuilder<T>> addField(String context, FieldDescriptor descriptor, final GroupBuilder<T> builder, boolean enumAsString, FieldIdMapper mapper, ImmutableSetMultimap<String, Integer> seen, int depth) {
     if (descriptor.getJavaType() == JavaType.MESSAGE) {
-      return addMessageField(context, descriptor, builder, mapper, seen, depth);
+      return addMessageField(context, descriptor, builder, enumAsString, mapper, seen, depth);
     }
 
-    ParquetType parquetType = getParquetType(descriptor);
+    ParquetType parquetType = getParquetType(descriptor, enumAsString);
     if (descriptor.isRepeated() && parquetSpecsCompliant) {
       // the old schema style did not include the LIST wrapper around repeated fields
       return addRepeatedPrimitive(parquetType.primitiveType, parquetType.logicalTypeAnnotation, builder);
@@ -190,18 +198,18 @@ public class ProtoSchemaConverter {
         .named("list");
   }
 
-  private <T> GroupBuilder<GroupBuilder<T>> addRepeatedMessage(String context, FieldDescriptor descriptor, GroupBuilder<T> builder, FieldIdMapper mapper, ImmutableSetMultimap<String, Integer> seen, int depth) {
+  private <T> GroupBuilder<GroupBuilder<T>> addRepeatedMessage(String context, FieldDescriptor descriptor, GroupBuilder<T> builder, boolean enumAsString, FieldIdMapper mapper, ImmutableSetMultimap<String, Integer> seen, int depth) {
     GroupBuilder<GroupBuilder<GroupBuilder<GroupBuilder<T>>>> result = builder
         .group(Type.Repetition.OPTIONAL).as(listType())
         .group(Type.Repetition.REPEATED)
         .group(Type.Repetition.OPTIONAL);
 
-    convertFields(result, context + "." + descriptor.getName(), descriptor.getMessageType().getFields(), mapper, seen, depth);
+    convertFields(result, context + "." + descriptor.getName(), descriptor.getMessageType().getFields(), enumAsString, mapper, seen, depth);
 
     return result.named("element").named("list");
   }
 
-  private <T> Builder<? extends Builder<?, GroupBuilder<T>>, GroupBuilder<T>> addMessageField(String context, FieldDescriptor descriptor, final GroupBuilder<T> builder, FieldIdMapper mapper, ImmutableSetMultimap<String, Integer> seen, int depth) {
+  private <T> Builder<? extends Builder<?, GroupBuilder<T>>, GroupBuilder<T>> addMessageField(String context, FieldDescriptor descriptor, final GroupBuilder<T> builder, boolean enumAsString, FieldIdMapper mapper, ImmutableSetMultimap<String, Integer> seen, int depth) {
     // Prevent recursion by terminating with optional proto bytes.
     depth += 1;
     String typeName = getInnerTypeName(descriptor);
@@ -214,19 +222,19 @@ public class ProtoSchemaConverter {
 
     if (descriptor.isMapField() && parquetSpecsCompliant) {
       // the old schema style did not include the MAP wrapper around map groups
-      return addMapField(context, descriptor, builder, mapper, seen, depth);
+      return addMapField(context, descriptor, builder, enumAsString, mapper, seen, depth);
     }
 
     seen = ImmutableSetMultimap.<String, Integer>builder().putAll(seen).put(typeName, depth).build();
 
     if (descriptor.isRepeated() && parquetSpecsCompliant) {
       // the old schema style did not include the LIST wrapper around repeated messages
-      return addRepeatedMessage(context, descriptor, builder, mapper, seen, depth);
+      return addRepeatedMessage(context, descriptor, builder, enumAsString, mapper, seen, depth);
     }
 
     // Plain message.
     GroupBuilder<GroupBuilder<T>> group = builder.group(getRepetition(descriptor));
-    convertFields(group, context + "." + descriptor.getName(), descriptor.getMessageType().getFields(), mapper, seen, depth);
+    convertFields(group, context + "." + descriptor.getName(), descriptor.getMessageType().getFields(), enumAsString, mapper, seen, depth);
     return group;
   }
 
@@ -244,25 +252,25 @@ public class ProtoSchemaConverter {
     return name;
   }
 
-  private <T> GroupBuilder<GroupBuilder<T>> addMapField(String context, FieldDescriptor descriptor, final GroupBuilder<T> builder, FieldIdMapper mapper, ImmutableSetMultimap<String, Integer> seen, int depth) {
+  private <T> GroupBuilder<GroupBuilder<T>> addMapField(String context, FieldDescriptor descriptor, final GroupBuilder<T> builder, boolean enumAsString, FieldIdMapper mapper, ImmutableSetMultimap<String, Integer> seen, int depth) {
     List<FieldDescriptor> fields = descriptor.getMessageType().getFields();
     if (fields.size() != 2) {
       throw new UnsupportedOperationException("Expected two fields for the map (key/value), but got: " + fields);
     }
 
-    ParquetType mapKeyParquetType = getParquetType(fields.get(0));
+    ParquetType mapKeyParquetType = getParquetType(fields.get(0), enumAsString);
 
     GroupBuilder<GroupBuilder<GroupBuilder<T>>> group = builder
         .group(Type.Repetition.OPTIONAL).as(mapType()) // only optional maps are allowed in Proto3
         .group(Type.Repetition.REPEATED) // key_value wrapper
         .primitive(mapKeyParquetType.primitiveType, Type.Repetition.REQUIRED).as(mapKeyParquetType.logicalTypeAnnotation).named("key");
 
-    return addField(context + "." + descriptor.getName(), fields.get(1), group, mapper, seen, depth)
+    return addField(context + "." + descriptor.getName(), fields.get(1), group, enumAsString, mapper, seen, depth)
         .named("value")
         .named("key_value");
   }
 
-  private static ParquetType getParquetType(FieldDescriptor fieldDescriptor) {
+  private static ParquetType getParquetType(FieldDescriptor fieldDescriptor, boolean enumAsString) {
     JavaType javaType = fieldDescriptor.getJavaType();
     switch (javaType) {
       case INT: return ParquetType.of(INT32);
@@ -271,7 +279,7 @@ public class ProtoSchemaConverter {
       case BOOLEAN: return ParquetType.of(BOOLEAN);
       case FLOAT: return ParquetType.of(FLOAT);
       case STRING: return ParquetType.of(BINARY, stringType());
-      case ENUM: return ParquetType.of(BINARY, enumType());
+      case ENUM: return ParquetType.of(BINARY, enumAsString ? stringType() : enumType());
       case BYTE_STRING: return ParquetType.of(BINARY);
       default:
         throw new UnsupportedOperationException("Cannot convert Protocol Buffer: unknown type " + javaType);

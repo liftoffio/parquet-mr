@@ -59,6 +59,7 @@ public class ProtoWriteSupport<T extends MessageOrBuilder> extends WriteSupport<
   private RecordConsumer recordConsumer;
   private Class<? extends Message> protoMessage;
   private Descriptor descriptor;
+  private boolean enumAsString;
   private FieldIdMapper mapper;
   private MessageWriter messageWriter;
   // Keep protobuf enum value with number in the metadata, so that in read time, a reader can read at least
@@ -66,19 +67,19 @@ public class ProtoWriteSupport<T extends MessageOrBuilder> extends WriteSupport<
   private Map<String, Map<String, Integer>> protoEnumBookKeeper = new HashMap<>();
 
   public ProtoWriteSupport() {
-    this(null, null, null);
+    this(null, null, false, null);
   }
 
   public ProtoWriteSupport(FieldIdMapper mapper) {
-    this(null, null, mapper);
+    this(null, null, false, mapper);
   }
 
   public ProtoWriteSupport(Class<? extends Message> protobufClass) {
-    this(protobufClass, null);
+    this(protobufClass, null, false, null);
   }
 
-  public ProtoWriteSupport(Class<? extends Message> protobufClass, FieldIdMapper mapper) {
-    this(protobufClass, null, mapper);
+  public ProtoWriteSupport(Class<? extends Message> protobufClass, boolean enumAsString, FieldIdMapper mapper) {
+    this(protobufClass, null, enumAsString, mapper);
   }
 
   public ProtoWriteSupport(Descriptor descriptor) {
@@ -86,12 +87,13 @@ public class ProtoWriteSupport<T extends MessageOrBuilder> extends WriteSupport<
   }
 
   public ProtoWriteSupport(Descriptor descriptor, FieldIdMapper mapper) {
-    this(null, descriptor, mapper);
+    this(null, descriptor, false, mapper);
   }
 
-  private ProtoWriteSupport(Class<? extends Message> protobufClass, Descriptor descriptor, FieldIdMapper mapper) {
+  private ProtoWriteSupport(Class<? extends Message> protobufClass, Descriptor descriptor, boolean enumAsString, FieldIdMapper mapper) {
     this.protoMessage = protobufClass;
     this.descriptor = descriptor;
+    this.enumAsString = enumAsString;
     if (mapper == null) {
       this.mapper = new DefaultFieldIdMapper();
     }
@@ -163,7 +165,7 @@ public class ProtoWriteSupport<T extends MessageOrBuilder> extends WriteSupport<
     }
 
     writeSpecsCompliant = configuration.getBoolean(PB_SPECS_COMPLIANT_WRITE, writeSpecsCompliant);
-    MessageType rootSchema = new ProtoSchemaConverter(configuration).convert(descriptor, mapper);
+    MessageType rootSchema = new ProtoSchemaConverter(configuration).convert(descriptor, enumAsString, mapper);
     validatedMapping(descriptor, rootSchema);
 
     this.messageWriter = new MessageWriter(descriptor, rootSchema);
