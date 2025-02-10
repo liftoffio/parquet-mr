@@ -33,6 +33,7 @@ import org.apache.parquet.schema.Type;
 import org.apache.parquet.schema.Types;
 import org.apache.parquet.schema.Types.Builder;
 import org.apache.parquet.schema.Types.GroupBuilder;
+import org.apache.parquet.schema.Types.PrimitiveBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -181,20 +182,28 @@ public class ProtoSchemaConverter {
     ParquetType parquetType = getParquetType(descriptor, enumAsString);
     if (descriptor.isRepeated() && parquetSpecsCompliant) {
       // the old schema style did not include the LIST wrapper around repeated fields
-      return addRepeatedPrimitive(parquetType.primitiveType, parquetType.logicalTypeAnnotation, builder);
+      return addRepeatedPrimitive(parquetType.primitiveType, context + "." + descriptor.getName(), mapper, parquetType.logicalTypeAnnotation, builder);
     }
 
     return builder.primitive(parquetType.primitiveType, getRepetition(descriptor)).as(parquetType.logicalTypeAnnotation);
   }
 
-  private static <T> Builder<? extends Builder<?, GroupBuilder<T>>, GroupBuilder<T>> addRepeatedPrimitive(PrimitiveTypeName primitiveType,
-                                                                                                   LogicalTypeAnnotation logicalTypeAnnotation,
-                                                                                                   final GroupBuilder<T> builder) {
-    return builder
+  private static <T> Builder<? extends Builder<?, GroupBuilder<T>>, GroupBuilder<T>> addRepeatedPrimitive(
+      PrimitiveTypeName primitiveType,
+      String context,
+      FieldIdMapper mapper,
+      LogicalTypeAnnotation logicalTypeAnnotation,
+      final GroupBuilder<T> builder) {
+    PrimitiveBuilder<GroupBuilder<GroupBuilder<GroupBuilder<T>>>> primitiveBuilder = builder
         .group(Type.Repetition.OPTIONAL).as(listType())
-          .group(Type.Repetition.REPEATED)
-            .primitive(primitiveType, Type.Repetition.REQUIRED).as(logicalTypeAnnotation)
-          .named("element")
+        .group(Type.Repetition.REPEATED)
+        .primitive(primitiveType, Type.Repetition.REQUIRED).as(logicalTypeAnnotation);
+    int fieldId = mapper.mapFieldId(context + ".list.element", null);
+    if (fieldId != -1) {
+      primitiveBuilder.id(fieldId);
+    }
+    return primitiveBuilder
+        .named("element")
         .named("list");
   }
 
