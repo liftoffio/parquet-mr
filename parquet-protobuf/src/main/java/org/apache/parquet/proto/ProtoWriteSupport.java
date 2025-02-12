@@ -617,6 +617,9 @@ public class ProtoWriteSupport<T extends MessageOrBuilder> extends WriteSupport<
   public static class DefaultFieldIdMapper implements FieldIdMapper {
 
     public int mapFieldId(String context, FieldDescriptor fieldDescriptor) {
+      if (fieldDescriptor == null) {
+        return -1;
+      }
       return fieldDescriptor.getNumber();
     }
   }
